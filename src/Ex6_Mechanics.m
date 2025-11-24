@@ -86,7 +86,8 @@ N_augmented = augmentCellMaps_2D(cat(3,N0,N_true), t(2:end), 4); %Last parameter
 
 %Step 2: Get relevant outputs from stress calculation at each time point in the augmented dataset
 % Displacement maps (each direction), strain maps (principal and shear), stress maps (principal and shear)
-[~, ~, Ux_aug, Uy_aug, Exx_aug, Eyy_aug, Exy_aug, Sxx_aug, Syy_aug, Sxy_aug] = getMechanicsMaps_2D(N_augmented, M, E, nu, d_dX, d_dY);
+stride = 4;
+[~, ~, Ux_aug, Uy_aug, Exx_aug, Eyy_aug, Exy_aug, Sxx_aug, Syy_aug, Sxy_aug] = getMechanicsMaps_2D(N_augmented, M, E, nu, d_dX, d_dY, stride);
 
 %Step 3: Get projection matrix for each portion of the stress calculation
 [V,k] = getProjectionMatrix(N_augmented, 0); %rank is determined by cell map reduction
