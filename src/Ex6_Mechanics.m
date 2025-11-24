@@ -102,8 +102,8 @@ V_s = getStressProjection_2D(Sxx_aug, Syy_aug, Sxy_aug, k);
 clear Sxx_aug Syy_aug Sxy_aug;
 
 %Step 4: Build and reduce mechanics matrices for solver
-[M,E,nu] = mech_matrix_build_2D(h, Tissues, bcs);
-[d_dX, d_dY] = grad_matrix(h, bcs);
+%[M,E,nu] = mech_matrix_build_2D(h, Tissues, bcs);
+%[d_dX, d_dY] = grad_matrix(h, bcs);
 S_mat = buildStrainMat(N0,E,nu);
 
 %Reduced operator for displacement solve
