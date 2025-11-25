@@ -1,16 +1,19 @@
 function [Damper, VM, Ux, Uy, Exx, Eyy, Exy, Sxx, Syy, Sxy, timings] = ...
     getMechanicsMaps_2D(N, M, E, nu, matX, matY, mode, stride)
 
-    if nargin < 8
-        mode = 'full'; % default
-        % full: compute mechanics every step (baseline)
-        % subsample: compute mechanics only at stride steps, reuse last values otherwise
-    end
-    if nargin < 9
-        stride = 1; % default
-        % stride: how often to recompute mechanics in subsample mode
-    end
-    
+    % goal: loop through time steps and call mechanics solver (get_damper) 
+    % to compute displ, strain, and stresses for each snapshot of N
+
+%     if nargin < 8
+%         mode = 'full'; % default
+%         % full: compute mechanics every step (baseline)
+%         % subsample: compute mechanics only at stride steps, reuse last values otherwise
+%     end
+%     if nargin < 9
+%         stride = 1; % default
+%         % stride: how often to recompute mechanics in subsample mode
+%     end
+%     
     [sy,sx,nt] = size(N);
 
     % preallocate
@@ -37,6 +40,7 @@ function [Damper, VM, Ux, Uy, Exx, Eyy, Exy, Sxx, Syy, Sxy, timings] = ...
              temp_Sxx, temp_Syy, temp_Sxy] = ...
                 get_damper(matX, matY, N(:,:,i), M, E, nu);
 
+            % reshape results back into 2D grids
             Damper(:,:,i) = reshape(temp_damper, sy,sx);
             VM(:,:,i)     = reshape(temp_vm, sy,sx);
             Ux(:,:,i)     = reshape(temp_x, sy,sx);
