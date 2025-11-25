@@ -47,7 +47,7 @@ else
 end
 
 %We use example data that has been processed and has correct formatting for loading
-location = [pwd,back, back,'Ex5_patient.mat'];
+location = [pwd,back, back,'/data/Ex5_patient.mat'];
 tumor = load(location);
 
 tumor.N(:,:,1) = tumor.image_data.NTC1;
@@ -86,8 +86,9 @@ N_augmented = augmentCellMaps_2D(cat(3,N0,N_true), t(2:end), 4); %Last parameter
 
 %Step 2: Get relevant outputs from stress calculation at each time point in the augmented dataset
 % Displacement maps (each direction), strain maps (principal and shear), stress maps (principal and shear)
-stride = 4;
-[~, ~, Ux_aug, Uy_aug, Exx_aug, Eyy_aug, Exy_aug, Sxx_aug, Syy_aug, Sxy_aug] = getMechanicsMaps_2D(N_augmented, M, E, nu, d_dX, d_dY, stride);
+mode = 'full';
+stride = 1;
+[~, ~, Ux_aug, Uy_aug, Exx_aug, Eyy_aug, Exy_aug, Sxx_aug, Syy_aug, Sxy_aug] = getMechanicsMaps_2D(N_augmented, M, E, nu, d_dX, d_dY, mode, stride);
 
 %Step 3: Get projection matrix for each portion of the stress calculation
 [V,k] = getProjectionMatrix(N_augmented, 0); %rank is determined by cell map reduction
@@ -124,7 +125,7 @@ Vs_SMAT_Ve = V_s' * S_mat * V_e;
 t_ROM_build = toc(start);
 
 
-clear S_mat V_Ux V_Uy V_u V_e M; %None of these are needed for the forward solver
+clear S_mat V_Ux V_Uy V_u V_e; %None of these are needed for the forward solver
 
 %% Reduced order stress solve
 %Input to reduced stress solver is reduced cell map
