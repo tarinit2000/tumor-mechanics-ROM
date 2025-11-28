@@ -10,8 +10,8 @@ This repository provides performance profiling, subsampling strategies, and trad
   - `getStressProjection_2D.m`, `buildStrainMat.m`, `run_tests.m`
   - `getMechanicsMaps_2D_LUonce.m`, `log_debug.m`
 - **`data/Ex5_patient.mat`** — example dataset
-- **`tests/`** — unit and smoke tests for reproducibility.
-- **`profiling/`** — profiler outputs (PDFs, traces).
+- **`tests/`** — unit and smoke tests for reproducibility
+- **`profiling/`** — profiler outputs 
 - **`results/`** — generated outputs:
   - `full_FOM_results.mat` — von Mises maps for FOM and subsampled runs
   - `optimization_log.txt` — run log with timings
@@ -33,17 +33,17 @@ This repository provides performance profiling, subsampling strategies, and trad
   - `bcs` — boundary conditions (from `BreastMask`)
 
 ## Outputs
-- **`results/full_FOM_results.mat`** — von Mises maps for FOM and subsampled runs.
-- **`results/optimization_log.txt`** — run log with timings.
-- **`results/per_step_error.png`** — per‑step relative error plot.
-- **`results/tradeoff_plot.png`** — tradeoff plot (average von Mises error vs. speedup).
-- **`results/run_env.mat`** — environment snapshot (MATLAB version, OS, CPU cores).
-- **`results/crash_dumps/`** — saved crash dumps on exceptions.
-- **`profiling/`** — profiler outputs (PDFs, traces).
+- **`results/full_FOM_results.mat`** — von Mises maps for FOM and subsampled runs
+- **`results/optimization_log.txt`** — run log with timings
+- **`results/per_step_error.png`** — per‑step relative error plot
+- **`results/tradeoff_plot.png`** — tradeoff plot (average von Mises error vs. speedup)
+- **`results/run_env.mat`** — environment snapshot (MATLAB version, OS, CPU cores)
+- **`results/crash_dumps/`** — saved crash dumps on exceptions
+- **`profiling/`** — profiler outputs
 
 ## How to Run
-1. Add helper functions to MATLAB path. From repo root, run: `addpath(genpath(pwd))`.
-2. Execute the main analysis script: `scripts/optimization_tradeoff.m`.
+1. Add helper functions to MATLAB path. From repo root, run: `addpath(genpath(pwd))`
+2. Execute the main analysis script: `scripts/optimization_tradeoff.m`
 3. Inspect outputs in the results/ folder:
    - `optimization_log.txt` — run log with timings
    - `full_FOM_results.mat` — saved von Mises maps
