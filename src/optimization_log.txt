@@ -1,0 +1,34 @@
+if system_dependent('IsDebugMode')==1, dbquit; end
+run_tests();
+{'run_tests' is not found in the current folder or on the MATLAB path, but exists in:
+    /Users/tarini/Documents/CSEM/Tools and Techniques/tumor-mechanics-ROM
+
+<a href = "matlab:internal.matlab.desktop.commandwindow.executeCommandForUser('cd ''/Users/tarini/Documents/CSEM/Tools and Techniques/tumor-mechanics-ROM''')">Change the MATLAB current folder</a> or <a href = "matlab:internal.matlab.desktop.commandwindow.executeCommandForUser('addpath ''/Users/tarini/Documents/CSEM/Tools and Techniques/tumor-mechanics-ROM''')">add its folder to the MATLAB path</a>.
+} 
+clc
+run_tests();
+Running TestCore
+..
+Done TestCore
+__________
+
+Running TestSolverConsistency
+..
+Done TestSolverConsistency
+__________
+
+  1×4 <a href="matlab:helpPopup matlab.unittest.TestResult" style="font-weight:bold">TestResult</a> array with properties:
+
+    Name
+    Passed
+    Failed
+    Incomplete
+    Duration
+    Details
+
+Totals:
+   4 Passed, 0 Failed, 0 Incomplete.
+   0.19325 seconds testing time.
+
+Saved test results to /Users/tarini/Documents/CSEM/Tools and Techniques/tumor-mechanics-ROM/tests/test_results.mat
+All tests passed.

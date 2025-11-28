@@ -11,19 +11,65 @@
 % augmentCellMaps_2D, getMechanicsMaps_2D, getProjectionMatrix, getDisplacementProjection_2D,
 % getStrainProjection_2D, getStressProjection_2D, buildStrainMat
 
+% INPUTS:
+%   - data/Ex5_patient.mat: contains image_data (NTC1, NTC2, NTC3, Tissues, BreastMask)
+%   - helper functions on MATLAB path
+%
+% OUTPUTS (written by script):
+%   - full_FOM_results.mat: VM maps for FOM and subsampled runs
+%   - optimization_log.txt: run log with timings
+%   - crash_dumps/: saved crash dumps on exceptions
+
+
 clear all; clc; close all;
+
+% Start logging to a text file
+logfile = fullfile(pwd, 'optimization_log.txt');
+if exist(logfile, 'file')
+    delete(logfile); % remove old log if it exists
+end
+diary(logfile);
+diary on;
+
+envinfo.MATLAB = version;
+envinfo.OS = system_dependent('getos');
+envinfo.CPU = feature('numcores');
+save('run_env.mat','envinfo');
+
+required = {'mech_matrix_build_2D','grad_matrix','buildBoundaries_2D', ...
+            'get_damper','getMechanicsMaps_2D','get_damper_reduced'};
+for f = required
+    if exist(f{1}, 'file') ~= 2
+        error('Missing required helper: %s. Add to MATLAB path.', f{1});
+    end
+end
+
+% Run some tests
+run_tests();
+
+disp('--- Housekeeping part 1 done... ---');
+
 disp('--- Optimization + Tradeoff Analysis (Full script) ---');
 
-%% -------------------------
-%% 1) Load data and setup
-%% -------------------------
+% -------------------------
+% 1) Load data and setup
+% -------------------------
 addpath(genpath(pwd));
 
 location = fullfile(pwd,'data','Ex5_patient.mat');
 if ~isfile(location)
     error('Data file not found: %s', location);
 end
-tumor = load(location);
+
+% Load data
+t0 = tic; tumor = load(location);  t_io = toc(t0);
+fprintf('I/O time = %.3fs\n', t_io);
+
+% Cheap check-sum to detect accidental changes to N later
+data_checksum = sum(double(tumor.image_data.NTC1(:)));
+
+% Start a run log
+log_debug('INFO','Loaded data file %s (I/O %.3fs) checksum=%g', location, t_io, data_checksum);
 
 % Assemble cell maps
 tumor.N(:,:,1) = tumor.image_data.NTC1;
@@ -38,58 +84,84 @@ h       = tumor.schedule_info.imagedims(1); % grid spacing (assumed square)
 bcs     = buildBoundaries_2D(tumor.image_data.BreastMask);
 Tissues = tumor.image_data.Tissues;
 
-%% -------------------------
-%% 2) Mechanics matrices
-%% -------------------------
-[M,E,nu] = mech_matrix_build_2D(h, Tissues, bcs);
-[d_dX, d_dY] = grad_matrix(h, bcs);
+try
+    % -------------------------
+    % 2) Mechanics matrices
+    % -------------------------
+    [M,E,nu] = mech_matrix_build_2D(h, Tissues, bcs);
+    [d_dX, d_dY] = grad_matrix(h, bcs);
 
-%% -------------------------
-%% 3) Full-order reference von Mises (single call)
-%% -------------------------
-% We get sig_vm here just for checking ROM single-point error later
-[~, sig_vm] = get_damper(d_dX, d_dY, N0, M, E, nu);
+    n = numel(N0);
+    assert(isequal(size(M),[2*n,2*n]), 'M must be 2n-by-2n where n=%d', n);
+    assert(size(d_dX,1)==n && size(d_dX,2)==n, 'grad matrices must be n-by-n');
 
-%% -------------------------
-%% 4) Build augmented snapshots and ROM bases
-%% -------------------------
-N_augmented = augmentCellMaps_2D(cat(3,N0,N_true), t(2:end), 4); % augmentation depth = 4
+    % -------------------------
+    % 3) Full-order reference von Mises (single call)
+    % -------------------------
+    % We get sig_vm here just for checking ROM single-point error later
+    [~, sig_vm] = get_damper(d_dX, d_dY, N0, M, E, nu);
 
-% Collect mechanics outputs across augmented time series (full solves) to build basis
-% We call this once just to get the data for POD
-[~, ~, Ux_aug, Uy_aug, Exx_aug, Eyy_aug, Exy_aug, Sxx_aug, Syy_aug, Sxy_aug] = ...
-    getMechanicsMaps_2D(N_augmented, M, E, nu, d_dX, d_dY, 'full', 1);
+    % -------------------------
+    % 4) Build augmented snapshots and ROM bases
+    % -------------------------
+    N_augmented = augmentCellMaps_2D(cat(3,N0,N_true), t(2:end), 4); % augmentation depth = 4
 
-% Build projection matrices / bases
-[V, k] = getProjectionMatrix(N_augmented, 0);
-[V_u, V_Ux, V_Uy] = getDisplacementProjection_2D(Ux_aug, Uy_aug, k);
-V_e = getStrainProjection_2D(Exx_aug, Eyy_aug, Exy_aug, k);
-V_s = getStressProjection_2D(Sxx_aug, Syy_aug, Sxy_aug, k);
+    % Collect mechanics outputs across augmented time series (full solves) to build basis
+    % We call this once just to get the data for POD
+    [~, ~, Ux_aug, Uy_aug, Exx_aug, Eyy_aug, Exy_aug, Sxx_aug, Syy_aug, Sxy_aug] = ...
+        getMechanicsMaps_2D(N_augmented, M, E, nu, d_dX, d_dY, 'full', 1);
 
-% Stress operator and reduced operators
-S_mat = buildStrainMat(N0, E, nu);
+    % Build projection matrices / bases
+    [V, k] = getProjectionMatrix(N_augmented, 0);
+    [V_u, V_Ux, V_Uy] = getDisplacementProjection_2D(Ux_aug, Uy_aug, k);
+    V_e = getStrainProjection_2D(Exx_aug, Eyy_aug, Exy_aug, k);
+    V_s = getStressProjection_2D(Sxx_aug, Syy_aug, Sxy_aug, k);
 
-M_r = V_u' * M * V_u;
+    % Stress operator and reduced operators
+    S_mat = buildStrainMat(N0, E, nu);
 
-% Compose gradient/projection operators
-Vu_gradXY_V = V_u' * [d_dX, zeros(size(d_dX)); zeros(size(d_dX)), d_dY] * ...
-              [V, zeros(size(V)); zeros(size(V)), V];
+    M_r = V_u' * M * V_u;
 
-Ve_gradXYY_Vu = V_e' * [d_dX, zeros(size(d_dX)), zeros(size(d_dX)); ...
-                        zeros(size(d_dX)), d_dY, zeros(size(d_dX)); ...
-                        zeros(size(d_dX)), zeros(size(d_dX)), d_dY] * ...
-                        [V_Ux, zeros(size(V_Uy)), zeros(size(V_Ux)); ...
-                         zeros(size(V_Ux)), V_Uy, zeros(size(V_Ux)); ...
-                         zeros(size(V_Ux)), zeros(size(V_Uy)), V_Ux];
+    % Compose gradient/projection operators
+    Vu_gradXY_V = V_u' * [d_dX, zeros(size(d_dX)); zeros(size(d_dX)), d_dY] * ...
+        [V, zeros(size(V)); zeros(size(V)), V];
 
-Vs_SMAT_Ve = V_s' * S_mat * V_e;
+    Ve_gradXYY_Vu = V_e' * [d_dX, zeros(size(d_dX)), zeros(size(d_dX)); ...
+        zeros(size(d_dX)), d_dY, zeros(size(d_dX)); ...
+        zeros(size(d_dX)), zeros(size(d_dX)), d_dY] * ...
+        [V_Ux, zeros(size(V_Uy)), zeros(size(V_Ux)); ...
+        zeros(size(V_Ux)), V_Uy, zeros(size(V_Ux)); ...
+        zeros(size(V_Ux)), zeros(size(V_Uy)), V_Ux];
 
-% Reduced initial state
-N0_r = V' * N0(:);
+    Vs_SMAT_Ve = V_s' * S_mat * V_e;
 
-%% -------------------------
-%% 5) Baseline ROM run (single reduced solve)
-%% -------------------------
+    % Reduced initial state
+    N0_r = V' * N0(:);
+
+    disp('--- Housekeeping part 2 done... ---');
+
+catch ME
+    timestamp = datestr(now,'yyyymmdd_HHMMSS');
+    dumpname = fullfile('crash_dumps', ['crash_' timestamp '.mat']);
+    % Save only variables that exist to avoid secondary errors
+    varsToSave = {'ME','location','data_checksum','t','h'};
+    optional = {'M','E','nu','N_augmented'};
+    for v = optional
+        if exist(v{1}, 'var'), varsToSave{end+1} = v{1}; end
+    end
+    try
+        save(dumpname, varsToSave{:}, '-v7.3');
+    catch
+        save(dumpname, 'ME', '-v7.3');
+    end
+    log_debug('ERROR','Crash saved to %s: %s', dumpname, ME.message);
+    rethrow(ME);
+end
+
+%% ---- Section 1: Subsampling -----
+% -------------------------
+% 5) Baseline ROM run (single reduced solve)
+% -------------------------
 % Use timeit for stable measurement
 rom_func = @() get_damper_reduced(Vu_gradXY_V, Ve_gradXYY_Vu, Vs_SMAT_Ve, N0_r, M_r, V_s);
 t_ROM_mech = timeit(rom_func);
@@ -100,20 +172,23 @@ t_ROM_mech = timeit(rom_func);
 fprintf('(1) Comparing baseline ROM, full FOM, and subsampled FOM:\n')
 fprintf('- ROM solve time: %.6f s\n', t_ROM_mech);
 
-%% -------------------------
-%% 6) Baseline full and subsampled mechanics (default stride)
-%% -------------------------
+% -------------------------
+% 6) Baseline full and subsampled mechanics (default stride)
+% -------------------------
 stride_default = 4;
 
 % --- Full mechanics ---
+n = numel(N_augmented(:,:,1));
+assert(isequal(size(M),[2*n,2*n]), 'M must be 2n-by-2n where n=%d', n);
 full_mech_func = @() getMechanicsMaps_2D(N_augmented, M, E, nu, d_dX, d_dY, 'full', 1);
 
 % Measure time (averaged)
-t_full_mech = timeit(full_mech_func); 
+t_full_mech = timeit(full_mech_func);
 
 % Get data (Capture VM directly as 2nd output!)
 [~, VM_full, Ux_full, Uy_full, Exx_full, Eyy_full, Exy_full, ...
     Sxx_full, Syy_full, Sxy_full] = full_mech_func();
+
 
 fprintf('- Full mechanics run time: %.6f s\n', t_full_mech);
 
@@ -129,9 +204,9 @@ t_sub_mech = timeit(sub_mech_func);
 
 fprintf('- Subsampled (stride=%d) run time: %.6f s\n', stride_default, t_sub_mech);
 
-%% -------------------------
-%% 7) Compute von Mises per time step (full and subsampled)
-%% -------------------------
+% -------------------------
+% 7) Compute von Mises per time step (full and subsampled)
+% -------------------------
 % Reshape pre-calculated VM outputs to (npts x nt)
 sig_vm_full_t = reshape(VM_full, [], size(VM_full,3));
 sig_vm_sub_t  = reshape(VM_sub,  [], size(VM_sub,3));
@@ -139,9 +214,16 @@ sig_vm_sub_t  = reshape(VM_sub,  [], size(VM_sub,3));
 % (No manual calculation loop needed anymore!)
 nt = size(VM_full,3);
 
-%% -------------------------
-%% 8) Per-time-step relative errors (von Mises + optional mechanics)
-%% -------------------------
+% instead of saving all variables -- save only what you need 
+t_io_start = tic;
+save('full_FOM_results.mat','VM_full','VM_sub','sig_vm_ROM','-v7.3');
+t_io_save = toc(t_io_start);
+fprintf('Final save I/O time = %.3f s\n', t_io_save);
+log_debug('INFO','Final save I/O time = %.3f s', t_io_save);
+
+% -------------------------
+% 8) Per-time-step relative errors (von Mises + optional mechanics)
+% -------------------------
 err_vm_t  = zeros(nt,1);
 err_Ux_t  = zeros(nt,1);
 err_Uy_t  = zeros(nt,1);
@@ -162,7 +244,7 @@ for i = 1:nt
     err_vm_t(i) = norm(sig_vm_full_t(:,i) - sig_vm_sub_t(:,i)) / den_vm;
 end
 
-%% Per-step plot: von Mises (primary) and optional other mechanics curves
+% Per-step plot: von Mises (primary) and optional other mechanics curves
 figure('Color','w','Position',[200 200 900 420]);
 
 plot(1:nt, 100*err_vm_t, '-ko', 'LineWidth',1.6, 'MarkerSize',6, 'DisplayName','von Mises (subsample vs FOM)');
@@ -180,7 +262,7 @@ legend('Location','northeastoutside');
 grid on;
 set(gca,'FontSize',11);
 
-%% Summary metrics (von Mises)
+% Summary metrics (von Mises)
 fprintf('(2) Summary metrics:\n')
 
 % Calculate averages (convert to percent)
@@ -198,7 +280,8 @@ fprintf('- Avg Sxx error (stride=%d): %.4f %%\n', stride_default, avg_err_Sxx_pc
 fprintf('- Avg Syy error (stride=%d): %.4f %%\n', stride_default, avg_err_Syy_pct);
 fprintf('- Avg Sxy error (stride=%d): %.4f %%\n', stride_default, avg_err_Sxy_pct);
 fprintf('- Avg VM  error (stride=%d): %.4f %%\n', stride_default, avg_err_vm_pct);
-%% Speedup factors (default stride + ROM)
+
+% Speedup factors (default stride + ROM)
 speedup_sub = t_full_mech / t_sub_mech;
 speedup_rom = t_full_mech / t_ROM_mech;
 
@@ -206,18 +289,18 @@ fprintf('(3) Speedup factors:\n')
 fprintf('Subsampled speedup factor (stride=%d): %.2f\n', stride_default, speedup_sub);
 fprintf('ROM speedup factor: %.2f\n', speedup_rom);
 
-%% -------------------------
-%% 9) Tradeoff sweep across strides (Fixed Duration)
-%% -------------------------
+% -------------------------
+% 9) Tradeoff sweep across strides (Fixed Duration)
+% -------------------------
 stride_values = [1, 2, 4, 8, 16];
 runtime_sub   = zeros(length(stride_values),1);
 avg_vm_error_sub = zeros(length(stride_values),1);
 
 fprintf('(4) Tradeoff btwn full & subsampled FOM: sweeping stride values\n');
 
-% Set how many times to repeat for averaging. 
+% Set how many times to repeat for averaging.
 % 5 is enough to smooth OS noise without taking forever.
-n_repeats = 5; 
+n_repeats = 5;
 
 for k = 1:length(stride_values)
     stride_k = stride_values(k);
@@ -229,13 +312,13 @@ for k = 1:length(stride_values)
         [~, VM_sub_k] = getMechanicsMaps_2D(N_augmented, M, E, nu, d_dX, d_dY, 'subsample', stride_k);
     end
     t_total = toc;
-    
+
     runtime_sub(k) = t_total / n_repeats;
 
     % 2. Compute von Mises error (using data from the loop)
     nt_k = size(VM_sub_k,3);
     err_vm_k = nan(nt_k,1);
-    
+
     for i = 1:nt_k
         vm_f_vec = sig_vm_full_t(:,i);
         vm_s_vec = reshape(VM_sub_k(:,:,i), [], 1);
@@ -248,16 +331,17 @@ for k = 1:length(stride_values)
     fprintf('stride=%d: runtime=%.6fs, avg von Mises err=%.4f (%.3f%%)\n', ...
         stride_k, runtime_sub(k), avg_vm_error_sub(k), 100*avg_vm_error_sub(k));
 end
-%% ROM single-point error (ensure alignment)
+
+% ROM single-point error (ensure alignment)
 rom_error = norm(sig_vm_ROM(:) - sig_vm(:)) / max(norm(sig_vm(:)), 1e-12);
 rom_speedup = t_full_mech / t_ROM_mech;
 fprintf('ROM error (von Mises) = %.4f (%.3f%%)\n', rom_error, 100*rom_error);
 
-%% -------------------------
-%% 10) Tradeoff plot (categorical) using von Mises errors
-%% -------------------------
-err_pct_sub = 100 * avg_vm_error_sub(:);          
-speedup_sub = t_full_mech ./ runtime_sub(:);      
+% -------------------------
+% 10) Tradeoff plot (categorical) using von Mises errors
+% -------------------------
+err_pct_sub = 100 * avg_vm_error_sub(:);
+speedup_sub = t_full_mech ./ runtime_sub(:);
 rom_err_pct  = 100 * rom_error;
 rom_spd      = rom_speedup;
 
@@ -302,4 +386,34 @@ end
 grid on;
 set(gca,'FontSize',11);
 
-disp('--- Script complete ---');
+disp('--- Section 1 complete ---');
+beep
+
+%% ---- Section 2: LU solve once -----
+
+disp('--- Section 2: LU solving once test ---');
+
+% --- Full mechanics with original get_damper (Section 1 baseline) ---
+full_mech_func_old = @() getMechanicsMaps_2D(N_augmented, M, E, nu, d_dX, d_dY, 'subsample', 4);
+t_full_mech_old = timeit(full_mech_func_old);
+
+% --- Full mechanics with cached LU get_damper (Section 2) ---
+full_mech_func_new = @() getMechanicsMaps_2D_LUonce(N_augmented, M, E, nu, d_dX, d_dY, 'subsample', 4);
+t_full_mech_new = timeit(full_mech_func_new);
+
+% Print comparison
+fprintf('Section 1 (original get_damper, stride=4) runtime: %.6f s\n', t_full_mech_old);
+fprintf('Section 2 (cached LU get_damper, stride=4) runtime: %.6f s\n', t_full_mech_new);
+fprintf('Speedup factor: %.2f\n', t_full_mech_old / t_full_mech_new);
+
+disp('--- Section 2 complete ---');
+beep
+
+% Stop logging
+diary off;
+disp('All results saved to optimization_log.txt');
+
+%% Memory snapshots
+% Using  whos and OS tools
+S = whos;
+fprintf('Total mem for variables: %.2f MB\n', sum([S.bytes]) / 1e6);
