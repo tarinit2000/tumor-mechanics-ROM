@@ -6,7 +6,7 @@ MATLAB Reduced Order Model (ROM) for tumor mechanics solver with performance pro
 - `get_damper*.m`, `getMechanicsMaps_2D.m`, `mech_matrix_build_2D.m`, ... — helper functions.
 - `data/Ex5_patient.mat` — example dataset (not included if large).
 - `tests/` — unit and smoke tests.
-- `figures/` — generated figures and profiler HTML.
+- `profiling/results/` — profiler pdf.
 - `crash_dumps/` — saved crash dumps on failure.
 
 ## Inputs
@@ -14,27 +14,20 @@ MATLAB Reduced Order Model (ROM) for tumor mechanics solver with performance pro
 - `h` (grid spacing) and `bcs` are derived from `schedule_info` and `BreastMask`.
 
 ## Outputs
-- `figures/` — PNGs of per-step error, spatial comparisons, tradeoff plots.
 - `full_FOM_results.mat` — saved VM maps for FOM and subsampled runs.
 - `optimization_log.txt` — run log with timings.
-- `profiler_report/` — profiler HTML saved by `profsave`.
+- `profiling/results/` — profiler pdf.
 
 ## How to run
 1. Add helper functions to MATLAB path: `addpath(genpath(pwd))`.
 2. Run `optimization_tradeoff.m`.
-3. Check `optimization_log.txt`, `figures/`, and `profiler_report/`.
+3. Check `optimization_log.txt`
 
 ## Reproducibility
-- Set `setenv('OMP_NUM_THREADS','1')` before starting MATLAB for stable timings.
 - Use `smoke_test()` to validate core functionality quickly.
 
 ## Tests & verification
-See `tests/README.md` for unit tests and verification cases.
-
-## Performance experiments
-Scripts:
-- `benchmarks/run_benchmarks.m` — runs timeit sweeps (stride, ROM) and saves CSV.
-- `benchmarks/plot_benchmarks.m` — generates speedup vs error plots.
+See `tests/` for unit tests and verification cases.
 
 ## Contact
 Code authors: Chase Christenson, Graham Pash, Casey Stowers, Tarini Thiagarajan
