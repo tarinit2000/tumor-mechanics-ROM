@@ -11,7 +11,7 @@
 % augmentCellMaps_2D, getMechanicsMaps_2D, getProjectionMatrix, getDisplacementProjection_2D,
 % getStrainProjection_2D, getStressProjection_2D, buildStrainMat
 
-clear; clc; close all;
+clear all; clc; close all;
 disp('--- Optimization + Tradeoff Analysis (Full script) ---');
 
 %% -------------------------
