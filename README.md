@@ -1,6 +1,5 @@
 # Tumor Mechanics ROM — Optimization & Tradeoff Analysis
-This repository provides performance profiling, subsampling strategies, and tradeoff analysis between full‑order models (FOM), subsampled FOM, and ROM.  
-It is an updated and streamlined version of the original *PODforTumors* repository.
+This repository provides performance profiling, subsampling strategies, and tradeoff analysis between full‑order models (FOM), subsampled FOM, and ROM. Please note that this project is an updated and streamlined version of the original *PODforTumors* repository.
 
 ## Repository Structure
 - **`scripts/optimization_tradeoff.m`** — main analysis script (runs FOM, subsampled FOM, ROM, generates plots).
