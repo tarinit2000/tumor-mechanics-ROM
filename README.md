@@ -10,7 +10,7 @@ It is an updated and streamlined version of the original *PODforTumors* reposito
   - `getProjectionMatrix.m`, `getDisplacementProjection_2D.m`, `getStrainProjection_2D.m`
   - `getStressProjection_2D.m`, `buildStrainMat.m`, `run_tests.m`
   - `getMechanicsMaps_2D_LUonce.m`, `log_debug.m`
-- **`data/Ex5_patient.mat`** — example dataset (may be excluded if large).
+- **`data/Ex5_patient.mat`** — example dataset
 - **`tests/`** — unit and smoke tests for reproducibility.
 - **`profiling/`** — profiler outputs (PDFs, traces).
 - **`results/`** — generated outputs:
@@ -22,11 +22,11 @@ It is an updated and streamlined version of the original *PODforTumors* reposito
 
 ## Inputs
 - **`data/Ex5_patient.mat`** — example dataset containing:
-  - **`image_data`**:  
+  - `image_data`:  
     - `NTC1`, `NTC2`, `NTC3` — cell maps  
     - `Tissues` — tissue property map  
     - `BreastMask` — binary mask for boundary conditions
-  - **`schedule_info`**:  
+  - `schedule_info`:  
     - `times` — imaging time points  
     - `imagedims` — grid dimensions (used to derive spacing)
 - **Derived parameters**:  
