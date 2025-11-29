@@ -18,38 +18,52 @@
 % OUTPUTS (written by script):
 %   - full_FOM_results.mat: VM maps for FOM and subsampled runs
 %   - optimization_log.txt: run log with timings
-%   - crash_dumps/: saved crash dumps on exceptions
-
+%   - crash_dumps: saved crash dumps on exceptions
 
 clear all; clc; close all;
 
-% Start logging to a text file
-logfile = fullfile(pwd, 'optimization_log.txt');
+% --- Saving out to results/ --- 
+% Create necessary folders if they don't already exist
+if ~exist('crash_dumps','dir'), mkdir('crash_dumps'); end
+if ~exist('results','dir'), mkdir('results'); end
+if ~exist('profiling','dir'), mkdir('profiling'); end
+
+% Name some helpful dirctories for ease of use
+results_dir = fullfile(pwd, 'results');
+crash_dir = fullfile(results_dir, 'crash_dumps');
+
+% Start logging to a text file and save out to results/
+logfile = fullfile(results_dir, 'optimization_log.txt');
 if exist(logfile, 'file')
     delete(logfile); % remove old log if it exists
 end
 diary(logfile);
 diary on;
 
+% Save out relevant env information
 envinfo.MATLAB = version;
 envinfo.OS = system_dependent('getos');
 envinfo.CPU = feature('numcores');
-save('run_env.mat','envinfo');
+save(fullfile(results_dir,'run_env.mat'),'envinfo');
 
+% Do you have all the required files to run this script? 
 required = {'mech_matrix_build_2D','grad_matrix','buildBoundaries_2D', ...
-            'get_damper','getMechanicsMaps_2D','get_damper_reduced'};
+            'get_damper','getMechanicsMaps_2D','get_damper_reduced', ...
+            'augmentCellMaps_2D','getProjectionMatrix','getDisplacementProjection_2D', ...
+            'getStrainProjection_2D','getStressProjection_2D','buildStrainMat', ...
+            'run_tests','getMechanicsMaps_2D_LUonce','log_debug'};
 for f = required
     if exist(f{1}, 'file') ~= 2
         error('Missing required helper: %s. Add to MATLAB path.', f{1});
     end
 end
 
-% Run some tests
+% Run some sanity checks to make sure code works as expected ... 
 run_tests();
 
-disp('--- Housekeeping part 1 done... ---');
+disp('--- Housekeeping Part 1 Done... ---');
 
-disp('--- Optimization + Tradeoff Analysis (Full script) ---');
+disp('--- Starting Optimization + Tradeoff Analysis ---');
 
 % -------------------------
 % 1) Load data and setup
@@ -142,6 +156,7 @@ try
 
 catch ME
     timestamp = datestr(now,'yyyymmdd_HHMMSS');
+    % Build dump filename with timestamp
     dumpname = fullfile('crash_dumps', ['crash_' timestamp '.mat']);
     % Save only variables that exist to avoid secondary errors
     varsToSave = {'ME','location','data_checksum','t','h'};
@@ -189,7 +204,6 @@ t_full_mech = timeit(full_mech_func);
 [~, VM_full, Ux_full, Uy_full, Exx_full, Eyy_full, Exy_full, ...
     Sxx_full, Syy_full, Sxy_full] = full_mech_func();
 
-
 fprintf('- Full mechanics run time: %.6f s\n', t_full_mech);
 
 % --- Subsampled mechanics (default stride) ---
@@ -210,13 +224,12 @@ fprintf('- Subsampled (stride=%d) run time: %.6f s\n', stride_default, t_sub_mec
 % Reshape pre-calculated VM outputs to (npts x nt)
 sig_vm_full_t = reshape(VM_full, [], size(VM_full,3));
 sig_vm_sub_t  = reshape(VM_sub,  [], size(VM_sub,3));
-
-% (No manual calculation loop needed anymore!)
 nt = size(VM_full,3);
 
-% instead of saving all variables -- save only what you need 
+% Instead of saving all variables, save only what you need to save time 
 t_io_start = tic;
-save('full_FOM_results.mat','VM_full','VM_sub','sig_vm_ROM','-v7.3');
+save(fullfile(results_dir,'full_FOM_results.mat'), ...
+     'VM_full','VM_sub','sig_vm_ROM','-v7.3');
 t_io_save = toc(t_io_start);
 fprintf('Final save I/O time = %.3f s\n', t_io_save);
 log_debug('INFO','Final save I/O time = %.3f s', t_io_save);
@@ -245,7 +258,7 @@ for i = 1:nt
 end
 
 % Per-step plot: von Mises (primary) and optional other mechanics curves
-figure('Color','w','Position',[200 200 900 420]);
+fig1 = figure('Color','w','Position',[200 200 900 420]);
 
 plot(1:nt, 100*err_vm_t, '-ko', 'LineWidth',1.6, 'MarkerSize',6, 'DisplayName','von Mises (subsample vs FOM)');
 hold on;
@@ -261,6 +274,8 @@ title(['Per-step relative error (stride=', num2str(stride_default), ')'],'FontWe
 legend('Location','northeastoutside');
 grid on;
 set(gca,'FontSize',11);
+
+saveas(fig1, fullfile(results_dir,'per_step_error.png'));
 
 % Summary metrics (von Mises)
 fprintf('(2) Summary metrics:\n')
@@ -349,7 +364,7 @@ cats = [arrayfun(@(s) sprintf('s=%d',s), stride_values, 'UniformOutput', false),
 xcat = categorical(cats);
 xcat = reordercats(xcat, cats);
 
-figure('Color','w','Position',[200 200 900 420]);
+fig2 = figure('Color','w','Position',[200 200 900 420]);
 
 % Left axis: von Mises error (%)
 yyaxis left
@@ -386,6 +401,8 @@ end
 grid on;
 set(gca,'FontSize',11);
 
+saveas(fig2, fullfile(results_dir,'tradeoff_plot.png'));
+
 disp('--- Section 1 complete ---');
 beep
 
@@ -393,18 +410,18 @@ beep
 
 disp('--- Section 2: LU solving once test ---');
 
-% --- Full mechanics with original get_damper (Section 1 baseline) ---
-full_mech_func_old = @() getMechanicsMaps_2D(N_augmented, M, E, nu, d_dX, d_dY, 'subsample', 4);
-t_full_mech_old = timeit(full_mech_func_old);
+% --- Subsampling mechanics (Section 1) ---
+sub_mech_func_old = @() getMechanicsMaps_2D(N_augmented, M, E, nu, d_dX, d_dY, 'subsample', 4);
+t_sub_mech_old = timeit(sub_mech_func_old);
 
-% --- Full mechanics with cached LU get_damper (Section 2) ---
-full_mech_func_new = @() getMechanicsMaps_2D_LUonce(N_augmented, M, E, nu, d_dX, d_dY, 'subsample', 4);
-t_full_mech_new = timeit(full_mech_func_new);
+% --- Subsampling mechanics with LU calculated ONCE (Section 2) ---
+sub_mech_func_new = @() getMechanicsMaps_2D_LUonce(N_augmented, M, E, nu, d_dX, d_dY, 'subsample', 4);
+t_sub_mech_new = timeit(sub_mech_func_new);
 
 % Print comparison
-fprintf('Section 1 (original get_damper, stride=4) runtime: %.6f s\n', t_full_mech_old);
-fprintf('Section 2 (cached LU get_damper, stride=4) runtime: %.6f s\n', t_full_mech_new);
-fprintf('Speedup factor: %.2f\n', t_full_mech_old / t_full_mech_new);
+fprintf('Section 1 (original get_damper, stride=4) runtime: %.6f s\n', t_sub_mech_old);
+fprintf('Section 2 (cached LU get_damper, stride=4) runtime: %.6f s\n', t_sub_mech_new);
+fprintf('Speedup factor: %.2f\n', t_sub_mech_old / t_sub_mech_new);
 
 disp('--- Section 2 complete ---');
 beep

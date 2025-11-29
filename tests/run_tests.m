@@ -9,12 +9,12 @@ function run_tests()
     results = runtests(testFolder);
     disp(results);
 
-    % Save a simple summary to disk
+    % Save out a summary to tests/
     outFile = fullfile(pwd,'tests','test_results.mat');
     save(outFile,'results');
     fprintf('Saved test results to %s\n', outFile);
 
-    % Optional: print failures in readable form
+    % Print failures in readable form
     failed = results([results.Failed] == 1);
     if ~isempty(failed)
         fprintf('Some tests failed (%d). See details above and test_results.mat\n', numel(failed));

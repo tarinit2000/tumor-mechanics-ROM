@@ -1,3 +1,0 @@
-Error using <a href="matlab:matlab.internal.language.introspective.errorDocCallback('optimization_analysis')" style="font-weight:bold">optimization_analysis</a>
-Missing required helper: mech_matrix_build_2D. Add to MATLAB path.
-
