@@ -22,6 +22,8 @@
 
 clear all; clc; close all;
 
+addpath(genpath(pwd));
+
 % --- Saving out to results/ --- 
 % Create necessary folders if they don't already exist
 if ~exist('crash_dumps','dir'), mkdir('crash_dumps'); end
@@ -68,8 +70,6 @@ disp('--- Starting Optimization + Tradeoff Analysis ---');
 % -------------------------
 % 1) Load data and setup
 % -------------------------
-addpath(genpath(pwd));
-
 location = fullfile(pwd,'data','Ex5_patient.mat');
 if ~isfile(location)
     error('Data file not found: %s', location);
@@ -304,6 +304,17 @@ fprintf('(3) Speedup factors:\n')
 fprintf('Subsampled speedup factor (stride=%d): %.2f\n', stride_default, speedup_sub);
 fprintf('ROM speedup factor: %.2f\n', speedup_rom);
 
+% --- Save profiling timings ---
+profiling_data = struct('t_full', t_full_mech, ...
+                        't_sub', t_sub_mech, ...
+                        't_rom', t_ROM_mech, ...
+                        'speedup_sub', speedup_sub, ...
+                        'speedup_rom', speedup_rom, ...
+                        'stride_default', stride_default);
+
+save(fullfile('profiling','timings.mat'),'profiling_data');
+fprintf('Profiling timings saved to profiling/timings.mat\n');
+
 % -------------------------
 % 9) Tradeoff sweep across strides (Fixed Duration)
 % -------------------------
@@ -346,6 +357,11 @@ for k = 1:length(stride_values)
     fprintf('stride=%d: runtime=%.6fs, avg von Mises err=%.4f (%.3f%%)\n', ...
         stride_k, runtime_sub(k), avg_vm_error_sub(k), 100*avg_vm_error_sub(k));
 end
+
+% Save out tradeoff sweep data
+save(fullfile('profiling','tradeoff_sweep.mat'), ...
+     'stride_values', 'runtime_sub', 'avg_vm_error_sub');
+fprintf('Tradeoff sweep data saved to profiling/tradeoff_sweep.mat\n');
 
 % ROM single-point error (ensure alignment)
 rom_error = norm(sig_vm_ROM(:) - sig_vm(:)) / max(norm(sig_vm(:)), 1e-12);
@@ -422,6 +438,12 @@ t_sub_mech_new = timeit(sub_mech_func_new);
 fprintf('Section 1 (original get_damper, stride=4) runtime: %.6f s\n', t_sub_mech_old);
 fprintf('Section 2 (cached LU get_damper, stride=4) runtime: %.6f s\n', t_sub_mech_new);
 fprintf('Speedup factor: %.2f\n', t_sub_mech_old / t_sub_mech_new);
+
+% Correctness check
+[~, VM_sub_old] = sub_mech_func_old(); 
+[~, VM_sub_new] = sub_mech_func_new();
+err_LU = norm(reshape(VM_sub_old,[],1)-reshape(VM_sub_new,[],1))/max(norm(reshape(VM_sub_old,[],1)),1e-12);
+fprintf('LU-once VM delta: %.3e\n', err_LU);
 
 disp('--- Section 2 complete ---');
 beep
