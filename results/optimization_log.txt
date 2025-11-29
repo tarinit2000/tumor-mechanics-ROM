@@ -1,12 +1,3 @@
-if system_dependent('IsDebugMode')==1, dbquit; end
-run_tests();
-{'run_tests' is not found in the current folder or on the MATLAB path, but exists in:
-    /Users/tarini/Documents/CSEM/Tools and Techniques/tumor-mechanics-ROM
-
-<a href = "matlab:internal.matlab.desktop.commandwindow.executeCommandForUser('cd ''/Users/tarini/Documents/CSEM/Tools and Techniques/tumor-mechanics-ROM''')">Change the MATLAB current folder</a> or <a href = "matlab:internal.matlab.desktop.commandwindow.executeCommandForUser('addpath ''/Users/tarini/Documents/CSEM/Tools and Techniques/tumor-mechanics-ROM''')">add its folder to the MATLAB path</a>.
-} 
-clc
-run_tests();
 Running TestCore
 ..
 Done TestCore
@@ -28,7 +19,51 @@ __________
 
 Totals:
    4 Passed, 0 Failed, 0 Incomplete.
-   0.19325 seconds testing time.
+   0.091189 seconds testing time.
 
 Saved test results to /Users/tarini/Documents/CSEM/Tools and Techniques/tumor-mechanics-ROM/tests/test_results.mat
 All tests passed.
+--- Housekeeping Part 1 Done... ---
+--- Starting Optimization + Tradeoff Analysis ---
+I/O time = 0.011s
+[18:40:37]  INFO: Loaded data file /Users/tarini/Documents/CSEM/Tools and Techniques/tumor-mechanics-ROM/data/Ex5_patient.mat (I/O 0.011s) checksum=1.93036e+08
+--- Housekeeping part 2 done... ---
+(1) Comparing baseline ROM, full FOM, and subsampled FOM:
+- ROM solve time: 0.000320 s
+- Full mechanics run time: 0.193495 s
+- Subsampled (stride=4) run time: 0.000153 s
+Final save I/O time = 0.096 s
+[18:43:27]  INFO: Final save I/O time = 0.096 s
+(2) Summary metrics:
+- Avg Ux  error (stride=4): 4.1982 %
+- Avg Uy  error (stride=4): 4.2233 %
+- Avg Sxx error (stride=4): 4.1704 %
+- Avg Syy error (stride=4): 4.1919 %
+- Avg Sxy error (stride=4): 4.0973 %
+- Avg VM  error (stride=4): 4.4509 %
+(3) Speedup factors:
+Subsampled speedup factor (stride=4): 1268.77
+ROM speedup factor: 605.13
+Profiling timings saved to profiling/timings.mat
+(4) Tradeoff btwn full & subsampled FOM: sweeping stride values
+stride=1: runtime=0.042145s, avg von Mises err=0.0000 (0.000%)
+stride=2: runtime=0.000053s, avg von Mises err=0.0151 (1.509%)
+stride=4: runtime=0.000100s, avg von Mises err=0.0445 (4.451%)
+stride=8: runtime=0.000039s, avg von Mises err=0.1048 (10.480%)
+stride=16: runtime=0.000114s, avg von Mises err=0.2325 (23.248%)
+Tradeoff sweep data saved to profiling/tradeoff_sweep.mat
+ROM error (von Mises) = 0.0129 (1.289%)
+--- Section 1 complete ---
+--- Section 2: LU solving once test ---
+Section 1 (original get_damper, stride=4) runtime: 0.000061 s
+Section 2 (cached LU get_damper, stride=4) runtime: 0.000059 s
+Speedup factor: 1.04
+{Unrecognized function or variable 'full_mech_func_old'.
+
+Error in <a href="matlab:matlab.internal.language.introspective.errorDocCallback('optimization_analysis', '/Users/tarini/Documents/CSEM/Tools and Techniques/tumor-mechanics-ROM/optimization_analysis.m', 443)" style="font-weight:bold">optimization_analysis</a> (<a href="matlab: opentoline('/Users/tarini/Documents/CSEM/Tools and Techniques/tumor-mechanics-ROM/optimization_analysis.m',443,0)">line 443</a>)
+[~, VM_sub_old] = full_mech_func_old();
+} 
+opentoline('/Users/tarini/Documents/CSEM/Tools and Techniques/tumor-mechanics-ROM/optimization_analysis.m',443,0)
+opentoline('/Users/tarini/Documents/CSEM/Tools and Techniques/tumor-mechanics-ROM/optimization_analysis.m',443,0)
+LU-once VM delta: 1.311e-14
+--- Section 2 complete ---
